@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <title>Upload to S3 and Process</title>
+</head>
+<body>
+    <div class="relative isolate overflow-hidden bg-gray-900 min-h-screen">
+        <!-- Background design -->
+        <svg class="absolute inset-0 -z-10 h-full w-full stroke-white/10" aria-hidden="true">
+            <defs>
+                <pattern id="pattern" width="400" height="400" patternUnits="userSpaceOnUse">
+                </pattern>
+            </defs>
+            <rect width="100%" height="100%" stroke-width="0" fill="transparent" />
+        </svg>
+
+        <!-- Main container -->
+        <div class="mx-auto max-w-7xl px-6 pb-24 pt-10 sm:pb-32 lg:flex lg:px-8 lg:py-40">
+            <!-- Left column with form and introduction -->
+            <div class="mx-auto max-w-2xl flex-shrink-0 lg:mx-0 lg:max-w-xl lg:pt-8">
+                <h1 class="mt-10 text-4xl font-bold tracking-tight text-white sm:text-5xl">AI-Driven Resume Parsing for Smarter Recruitment</h1>
+                <p class="mt-6 text-lg leading-8 text-gray-300">Harness the power of AI to analyze and organize resumes with ease.</p>
+                
+                <!-- File upload form -->
+                <div class="mt-10">
+                    <div class="flex flex-col sm:flex-row sm:items-center gap-x-6">
+                        <input type="file" id="fileInput" accept=".pdf"
+                               class="my-2 drop-shadow-md bg-white/10 font-semibold text-gray-900 border border-blue-300 py-2 px-4 rounded-2xl block w-full text-sm text-slate-500
+                               file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:bg-blue-50 file:text-blue-400 hover:file:bg-blue-100">
+                        <button id="uploadButton"
+                                class="mt-2 sm:mt-0 bg-blue-500 px-8 rounded-2xl py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-400/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600">
+                            Process
+                        </button>
+                    </div>
+                    <div id="status" class="mt-4 text-white"></div>
+                </div>
+            </div>
+            
+            <!-- Right column with image -->
+            <div class="mx-auto mt-16 max-w-2xl lg:ml-10 lg:mr-0 lg:mt-40 lg:max-w-none lg:flex-none xl:ml-32">
+                <img src="https://res.cloudinary.com/dtsuvx8dz/image/upload/v1716357077/o1imiun4wwcpia9uucgs.gif" alt="App screenshot"
+                     class="w-[15rem] rounded-md bg-white/5 shadow-2xl ring-1 ring-white/10">
+            </div>
+        </div>
+        
+        <!-- JSON Data Output Section -->
+        <div class="w-screen pb-8">
+            <div class="flex flex-col justify-center items-center text-white">
+                <div class="max-w-7xl p-8 w-full">
+                    <div class="border border-white rounded-lg p-6 bg-gray-800">
+                        <h2 class="text-xl font-bold mb-4">Parsed Resume Data</h2>
+                        <div id="parsedData" class="whitespace-pre-wrap text-sm bg-gray-900 p-4 rounded-md"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://sdk.amazonaws.com/js/aws-sdk-2.983.0.min.js"></script>
+    <script>
+        // Configure AWS SDK
+        AWS.config.update({
+            region: 'eu-west-3',
+            credentials: new AWS.Credentials('<ACCESS-KEY-ID>', '<ACCESS-KEY>')
+        });
+
+        const s3 = new AWS.S3();
+        const uploadBucket = 'BUCKET-NAME'; // Name of the bucket to store data
+        const apiGatewayUrl = 'YOUR-API-GATEWAY-URL'; // Your REST API URL including route, example : https://<ID>.execute-api.<REGION>.amazonaws.com/<STAGE>/<ROUTE>
+
+        document.getElementById('uploadButton').onclick = async function() {
+            const fileInput = document.getElementById('fileInput');
+            const statusDiv = document.getElementById('status');
+            const parsedDataDiv = document.getElementById('parsedData');
+
+            if (fileInput.files.length === 0) {
+                statusDiv.textContent = 'Please select a file to upload.';
+                return;
+            }
+
+            const file = fileInput.files[0];
+            const fileName = `${Date.now()}-${file.name}`;
+            statusDiv.textContent = 'Uploading...';
+
+            try {
+                const params = {
+                    Bucket: uploadBucket,
+                    Key: fileName,
+                    Body: file,
+                    ContentType: file.type
+                };
+
+                await s3.upload(params).promise();
+                statusDiv.textContent = 'File uploaded successfully! Processing...';
+
+                const response = await fetch(`${apiGatewayUrl}?filename=${encodeURIComponent(fileName)}`, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to retrieve processed data');
+                }
+
+                const data = await response.json();
+                statusDiv.textContent = 'File processed successfully!';
+                parsedDataDiv.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+
+            } catch (error) {
+                console.error('Error:', error);
+                statusDiv.textContent = `Error: ${error.message}`;
+            }
+        };
+    </script>
+</body>
+</html>
