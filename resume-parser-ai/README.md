@@ -26,6 +26,7 @@ graph LR
 - Direct S3 upload from browser
 - Serverless architecture
 - Real-time processing via API
+- Fast upload and download with S3 Transfer Acceleration
 - Downloadable JSON results
 - Modern UI with TailwindCSS
 - [coming soon] Resume Scoring System
